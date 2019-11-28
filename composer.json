@@ -18,12 +18,8 @@
     "require": {
         "php": "^7.2.5",
         "aws/aws-sdk-php": "^3.133",
-        "illuminate/database": "^7.0",
         "illuminate/log": "^7.0",
-        "laminas/laminas-text": "^2.7",
-        "laravel-zero/framework": "^7.0",
-        "nunomaduro/laravel-console-menu": "^3.0",
-        "aws/aws-sdk-php-laravel": "~3.0"
+        "laravel-zero/framework": "^7.0"
     },
     "require-dev": {
         "fzaninotto/faker": "^1.4",

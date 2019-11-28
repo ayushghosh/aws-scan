@@ -41,13 +41,20 @@ class ScanAws extends Command
 //        $this->notify("Hello Web Artisan", "Love beautiful..", "icon.png");
 
         $this->info('Checking all regions');
-
-        foreach ($regions as $region){
-            $this->task("Checking Region: ".$region, function () use (&$region) {
-                $security_fails = \App\AwsService::checkEc2SecurityGroups($region);
+        $security_fail_count = 0;
+        foreach ($regions as $region) {
+            $this->task("Checking Region: " . $region, function () use (&$region, &$security_fail_count) {
+                $security_fail_count = \App\AwsService::checkEc2SecurityGroups($region);
 //                sleep(2);
                 return true;
             });
+            if ($security_fail_count > 0) {
+                $this->error($security_fail_count . ' issues found');
+            }
+            else {
+                $this->info('No issue found');
+            }
+//            die();
 //            $this->error('4 issue found');
 
         }
@@ -56,16 +63,16 @@ class ScanAws extends Command
 //        dump($regions);
 
 
-
     }
 
     /**
      * Define the command's schedule.
      *
-     * @param  \Illuminate\Console\Scheduling\Schedule $schedule
+     * @param \Illuminate\Console\Scheduling\Schedule $schedule
      * @return void
      */
-    public function schedule(Schedule $schedule): void
+    public function schedule(Schedule $schedule)
+    : void
     {
         // $schedule->command(static::class)->everyMinute();
     }

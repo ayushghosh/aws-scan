@@ -2,9 +2,8 @@
 
 namespace App;
 
-use Illuminate\Database\Eloquent\Model;
 
-class AwsRegion extends Model
+class AwsRegion
 {
     public  $regions = [];
 
