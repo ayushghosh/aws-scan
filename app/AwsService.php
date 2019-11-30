@@ -38,10 +38,59 @@ class AwsService
 //        }
 //    }
 
-    public static function checkEc2SecurityGroups($region = 'ap-south-1')
+    public static function checkEc2SecurityGroups($region = 'ap-south-1', $policies)
     {
-        $security_groups = self::getEc2SecurityGroups($region);
-        return random_int(0,3);
+        self::validatePolicy($policies);
+        //        $security_groups = self::getEc2SecurityGroups($region);
+        return random_int(0, 3);
+    }
+
+    public static function validatePolicy($policies)
+    {
+        dump('p');
+        foreach ($policies as $policy) {
+            list($condition, $port, $cidr) = explode('|', $policy);
+//            dump($condition);
+//            dump($port);
+//            dump($cidr);
+            if ($condition != '!' && $condition != '=') {
+                return 'Invalid condition in policy, use ! or =';
+            }
+            if ($port < 1 || $port > 65536) {
+                return 'Invalid port in policy';
+            }
+
+            if (self::validateCidr($cidr) == false) {
+                return 'Invalid CIDR';
+            }
+        }
+
+        return true;
+    }
+
+    public static function validateCidr($cidr)
+    {
+        $parts = explode('/', $cidr);
+        if (count($parts) != 2) {
+            return false;
+        }
+
+        $ip = $parts[0];
+        $netmask = intval($parts[1]);
+
+        if ($netmask < 0) {
+            return false;
+        }
+
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return $netmask <= 32;
+        }
+
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+            return $netmask <= 128;
+        }
+
+        return false;
     }
 
     public static function getEc2SecurityGroups($region = 'ap-south-1')

@@ -19,6 +19,7 @@
         "php": "^7.2.5",
         "aws/aws-sdk-php": "^3.133",
         "illuminate/log": "^7.0",
+        "laminas/laminas-text": "^2.7",
         "laravel-zero/framework": "^7.0"
     },
     "require-dev": {

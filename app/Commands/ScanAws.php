@@ -14,7 +14,7 @@ class ScanAws extends Command
      *
      * @var string
      */
-    protected $signature = 'scan';
+    protected $signature = 'scan {--policy=* : Policy format to check, ex: =|22|0.0.0.0/32}';
 
     /**
      * The description of the command.
@@ -30,6 +30,13 @@ class ScanAws extends Command
      */
     public function handle()
     {
+        $policies = $this->option('policy');
+        $valid_policy_status = \App\AwsService::validatePolicy($policies);
+        dump($valid_policy_status);
+        if ($valid_policy_status !== true) {
+            $this->error($valid_policy_status);
+        }
+        exit();
         $regions = [];
         $this->task("Getting AWS Regions", function () use (&$regions) {
             $regions_arr = \App\AwsService::getRegions();
@@ -43,8 +50,8 @@ class ScanAws extends Command
         $this->info('Checking all regions');
         $security_fail_count = 0;
         foreach ($regions as $region) {
-            $this->task("Checking Region: " . $region, function () use (&$region, &$security_fail_count) {
-                $security_fail_count = \App\AwsService::checkEc2SecurityGroups($region);
+            $this->task("Checking Region: " . $region, function () use (&$region, &$security_fail_count, $policies) {
+                $security_fail_count = \App\AwsService::checkEc2SecurityGroups($region, $policies);
 //                sleep(2);
                 return true;
             });
