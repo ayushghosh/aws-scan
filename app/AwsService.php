@@ -7,6 +7,8 @@ use Aws\MultiRegionClient;
 class AwsService
 {
     public static $awsClient;
+    public static $active_region = '';
+    public static $policies = [];
 
     public static function getRegions()
     {
@@ -38,59 +40,12 @@ class AwsService
 //        }
 //    }
 
-    public static function checkEc2SecurityGroups($region = 'ap-south-1', $policies)
+    public static function checkEc2SecurityGroups($region = 'ap-south-1')
     {
-        self::validatePolicy($policies);
-        //        $security_groups = self::getEc2SecurityGroups($region);
-        return random_int(0, 3);
-    }
+        $security_groups = self::getEc2SecurityGroups($region);
 
-    public static function validatePolicy($policies)
-    {
-        dump('p');
-        foreach ($policies as $policy) {
-            list($condition, $port, $cidr) = explode('|', $policy);
-//            dump($condition);
-//            dump($port);
-//            dump($cidr);
-            if ($condition != '!' && $condition != '=') {
-                return 'Invalid condition in policy, use ! or =';
-            }
-            if ($port < 1 || $port > 65536) {
-                return 'Invalid port in policy';
-            }
-
-            if (self::validateCidr($cidr) == false) {
-                return 'Invalid CIDR';
-            }
-        }
-
-        return true;
-    }
-
-    public static function validateCidr($cidr)
-    {
-        $parts = explode('/', $cidr);
-        if (count($parts) != 2) {
-            return false;
-        }
-
-        $ip = $parts[0];
-        $netmask = intval($parts[1]);
-
-        if ($netmask < 0) {
-            return false;
-        }
-
-        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-            return $netmask <= 32;
-        }
-
-        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
-            return $netmask <= 128;
-        }
-
-        return false;
+        $matches = self::validateSecurityGroup($security_groups);
+        return $matches;
     }
 
     public static function getEc2SecurityGroups($region = 'ap-south-1')
@@ -129,5 +84,103 @@ class AwsService
         }
 
         return $sg_arr;
+    }
+
+    public static function validateSecurityGroup($security_groups)
+    {
+        $matches = [];
+        foreach ($security_groups as $security_group) {
+            foreach ($security_group['ingress'] as $ingress) {
+                foreach (self::$policies as $policy) {
+                    switch ($policy['condition']) {
+                        case '=' :
+                            if (($policy['port'] >= $ingress['port_from'] && $policy['port'] <= $ingress['port_to']) && $policy['cidr'] == $ingress['cidr']) {
+                                $matches[] = [
+                                    'region' => self::$active_region,
+                                    'group_name' => $security_group['group_name'],
+                                    'group_id' => $security_group['group_id'],
+                                    'policy' => $policy['name'],
+                                    'port' => $policy['port'],
+                                    'cidr' => $ingress['cidr']
+                                ];
+//                                dump('match ' . $policy['port'] . ' ' . $security_group['group_name'] . ' ' . $security_group['group_id']);
+                            }
+                            break;
+                        case '!':
+                            if (($policy['port'] >= $ingress['port_from'] && $policy['port'] <= $ingress['port_to']) && $policy['cidr'] != $ingress['cidr']) {
+                                $matches[$policy['name']][] = [
+                                    'group_name' => $security_group['group_name'],
+                                    'group_id' => $security_group['group_id'],
+                                    'port' => $policy['port'],
+                                    'cidr' => $ingress['cidr']
+                                ];
+//                                dump('match ' . $policy['port'] . ' ' . $security_group['group_name'] . ' ' . $security_group['group_id']);
+                            }
+                            break;
+                    }
+                }
+            }
+        }
+        return $matches;
+    }
+
+    public static function validatePolicyFormat($policies)
+    {
+        foreach ($policies as $policy) {
+            try {
+                if (count(explode('|', $policy)) != 4) {
+                    throw new \Exception('invalid policy');
+                }
+                list($name, $condition, $port, $cidr) = explode('|', $policy);
+
+            } catch (\Exception $e) {
+                return 'Invalid policy format in policy "' . $policy . '"';
+
+            }
+            self::$policies[] = [
+                'name' => $name,
+                'condition' => $condition,
+                'port' => $port,
+                'cidr' => $cidr,
+            ];
+            if ($condition != '!' && $condition != '=') {
+                return 'Invalid condition "' . $condition . '" in policy "' . $name . '" , use ! or =';
+            }
+            if ($port < 1 || $port > 65536) {
+                return 'Invalid port "' . $port . '" in policy "' . $name . '"';
+            }
+
+            if (self::validateCidr($cidr) == false) {
+                return 'Invalid CIDR "' . $cidr . '" in policy "' . $name . '"';
+            }
+        }
+
+        return true;
+    }
+
+    public
+    static function validateCidr($cidr)
+    {
+        $parts = explode('/', $cidr);
+        if (count($parts) != 2) {
+            return false;
+        }
+
+        $ip = $parts[0];
+        $netmask = intval($parts[1]);
+
+        if ($netmask < 0) {
+            return false;
+        }
+
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return $netmask <= 32;
+        }
+
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+            return $netmask <= 128;
+        }
+
+        return false;
     }
 }

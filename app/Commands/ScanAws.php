@@ -14,7 +14,7 @@ class ScanAws extends Command
      *
      * @var string
      */
-    protected $signature = 'scan {--policy=* : Policy format to check, ex: =|22|0.0.0.0/32}';
+    protected $signature = 'scan {--policy=* : Policy to check in format: name|condition[=,!]|port|cidr}';
 
     /**
      * The description of the command.
@@ -31,12 +31,14 @@ class ScanAws extends Command
     public function handle()
     {
         $policies = $this->option('policy');
-        $valid_policy_status = \App\AwsService::validatePolicy($policies);
-        dump($valid_policy_status);
-        if ($valid_policy_status !== true) {
-            $this->error($valid_policy_status);
+        if (count($policies) > 0) {
+            $valid_policy_status = \App\AwsService::validatePolicyFormat($policies);
+            if ($valid_policy_status !== true) {
+                $this->error($valid_policy_status);
+                exit(1);
+            }
         }
-        exit();
+
         $regions = [];
         $this->task("Getting AWS Regions", function () use (&$regions) {
             $regions_arr = \App\AwsService::getRegions();
@@ -49,10 +51,17 @@ class ScanAws extends Command
 
         $this->info('Checking all regions');
         $security_fail_count = 0;
+        $security_fails = [];
         foreach ($regions as $region) {
-            $this->task("Checking Region: " . $region, function () use (&$region, &$security_fail_count, $policies) {
-                $security_fail_count = \App\AwsService::checkEc2SecurityGroups($region, $policies);
-//                sleep(2);
+            $this->task("Checking Region: " . $region, function () use (&$region, &$security_fail_count, &$security_fails) {
+                //Set Active region to create array
+                \App\AwsService::$active_region = $region;
+
+                $security_fails_region = \App\AwsService::checkEc2SecurityGroups($region);
+//                dump($security_fails_region);
+                $security_fails[$region] = $security_fails_region;
+
+                $security_fail_count = count($security_fails_region);
                 return true;
             });
             if ($security_fail_count > 0) {
@@ -61,14 +70,13 @@ class ScanAws extends Command
             else {
                 $this->info('No issue found');
             }
-//            die();
-//            $this->error('4 issue found');
-
+//            dump($security_fails);
         }
-//        dump($x);
-
-//        dump($regions);
-
+        foreach ($regions as $region) {
+            if (isset($security_fails[$region])) {
+                $this->table(['region', 'sg_name', 'sg_id', 'policy', 'port', 'cidr'], $security_fails[$region]);
+            }
+        }
 
     }
 
