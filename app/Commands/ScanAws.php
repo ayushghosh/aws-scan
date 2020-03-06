@@ -73,7 +73,7 @@ class ScanAws extends Command
 //            dump($security_fails);
         }
         foreach ($regions as $region) {
-            if (isset($security_fails[$region])) {
+            if (isset($security_fails[$region]) && count($security_fails[$region])) {
                 $this->table(['region', 'sg_name', 'sg_id', 'policy', 'port', 'cidr'], $security_fails[$region]);
             }
         }
