@@ -12,24 +12,41 @@ class AwsService
 
     public static function getRegions()
     {
-        self::make();
-        $regions = self::$awsClient->describeRegions();
+
+        try {
+            $regions = self::$awsClient->describeRegions();
+        } catch (\Exception $e) {
+            die('Unable to connect to AWS, tried environment variables and default profile');
+        }
+
+
         $regions_arr = collect($regions['Regions'])->pluck('RegionName')->toArray();
         return $regions_arr;
     }
 
-    public static function make($region = 'ap-south-1', $service = 'ec2')
+    public static function make2($region = 'ap-south-1', $service = 'ec2')
     {
         $awsClient = new \Aws\MultiRegionClient([
                                                     'region' => $region,
                                                     'version' => 'latest',
-                                                    'profile' => 'default',
-                                                    "service" => $service
+                                                    "service" => $service,
+                                                    'credentials' => [
+                                                        'key' => env('AWS_ACCESS_KEY_ID'),
+                                                        'secret' => env('AWS_SECRET_ACCESS_KEY')
+                                                    ],
                                                 ]);
 
 //        dump($awsClient);
 //        die();
         self::$awsClient = $awsClient;
+    }
+
+    public static function checkEc2SecurityGroups($region = 'ap-south-1')
+    {
+        $security_groups = self::getEc2SecurityGroups($region);
+
+        $matches = self::validateSecurityGroup($security_groups);
+        return $matches;
     }
 
 //    public static function checkEc2SecurityGroupsRegions($regions)
@@ -39,14 +56,6 @@ class AwsService
 //            $sg_regions[$region] = self::checkEc2SecurityGroups($region);
 //        }
 //    }
-
-    public static function checkEc2SecurityGroups($region = 'ap-south-1')
-    {
-        $security_groups = self::getEc2SecurityGroups($region);
-
-        $matches = self::validateSecurityGroup($security_groups);
-        return $matches;
-    }
 
     public static function getEc2SecurityGroups($region = 'ap-south-1')
     {
@@ -84,6 +93,39 @@ class AwsService
         }
 
         return $sg_arr;
+    }
+
+    public static function make($region = 'ap-south-1', $service = 'ec2')
+    {
+        $aws_access_key_id = env('AWS_ACCESS_KEY_ID');
+        $aws_secret_access_key = env('AWS_SECRET_ACCESS_KEY');
+
+        if (isset($aws_access_key_id) && isset($aws_secret_access_key)) {
+
+            if ($aws_access_key_id == '' || $aws_secret_access_key == '') {
+                return 'AWS credential environment variable present but empty';
+            }
+
+            $awsClient = new \Aws\MultiRegionClient([
+                                                        'region' => $region,
+                                                        'version' => 'latest',
+                                                        "service" => $service,
+                                                        'credentials' => [
+                                                            'key' => env('AWS_ACCESS_KEY_ID'),
+                                                            'secret' => env('AWS_SECRET_ACCESS_KEY')
+                                                        ],
+                                                    ]);
+        }
+        else {
+            $awsClient = new \Aws\MultiRegionClient([
+                                                        'region' => $region,
+                                                        'version' => 'latest',
+                                                        'profile' => 'default',
+                                                        "service" => $service
+                                                    ]);
+        }
+        self::$awsClient = $awsClient;
+        return true;
     }
 
     public static function validateSecurityGroup($security_groups)
@@ -183,4 +225,16 @@ class AwsService
 
         return false;
     }
+
+    public static function str_putcsv($input, $delimiter = ',', $enclosure = '"')
+    {
+        $fp = fopen('php://temp', 'r+b');
+        fputcsv($fp, $input, $delimiter, $enclosure);
+        rewind($fp);
+        $data = rtrim(stream_get_contents($fp), "\n");
+        fclose($fp);
+        return $data;
+    }
+
+
 }

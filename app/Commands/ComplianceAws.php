@@ -28,7 +28,7 @@ class ComplianceAws extends Command
      */
     public function handle()
     {
-        //
+        $this->info('I am sorry this is not implemented, use the scan command');
     }
 
     /**

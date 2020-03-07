@@ -35,10 +35,17 @@ class ScanAws extends Command
             $valid_policy_status = \App\AwsService::validatePolicyFormat($policies);
             if ($valid_policy_status !== true) {
                 $this->error($valid_policy_status);
+                $this->error('exiting');
                 exit(1);
             }
         }
 
+        $can_connect_aws = \App\AwsService::make();
+        if($can_connect_aws !== true){
+            $this->error($can_connect_aws);
+            $this->error('exiting');
+            exit(1);
+        }
         $regions = [];
         $this->task("Getting AWS Regions", function () use (&$regions) {
             $regions_arr = \App\AwsService::getRegions();
@@ -72,6 +79,7 @@ class ScanAws extends Command
             }
 //            dump($security_fails);
         }
+
         foreach ($regions as $region) {
             if (isset($security_fails[$region]) && count($security_fails[$region])) {
                 $this->table(['region', 'sg_name', 'sg_id', 'policy', 'port', 'cidr'], $security_fails[$region]);
